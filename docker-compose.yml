@@ -1,0 +1,115 @@
+version: '3'
+
+services:
+  web:
+    image: ubuntu:20.04
+   # ports:
+   #   - "80:80"
+    restart: always  
+    volumes:
+      - ./src:/var/www/html
+      #- ./uploads:/var/www/html/uploads
+      - ./links:/var/www/html/links/
+     # - ./bot.sh:/bot.sh
+    command: >
+      bash -c "
+        export DEBIAN_FRONTEND=noninteractive &&
+        apt-get update && 
+        apt-get install -y curl openssh-server iputils-ping tcpdump sudo net-tools netcat python3 python3-pip nano git wget apache2 php libapache2-mod-php php-mysql &&
+        service ssh start &&
+        chown -R www-data:www-data /var/www/html &&
+        /usr/sbin/apachectl -D FOREGROUND 
+      "
+      
+    networks:
+      - my_network
+
+
+  db:
+    image: mysql:latest
+    environment:
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'true'
+      MYSQL_DATABASE: mydatabase
+      MYSQL_USER: myusername
+      MYSQL_PASSWORD: mypassword
+      bind-address: 0.0.0.0
+    restart: always  
+    volumes:
+      - ./data:/var/lib/mysql
+      - ./init-db/init.sql:/docker-entrypoint-initdb.d/init.sql # mount the init.sql script as a volume
+    networks:
+      - my_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    #ports:
+    #  - "8082:80"
+    restart: always  
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: mypassword
+      MYSQL_USER: myusername
+      MYSQL_PASSWORD: mypassword 
+    networks:
+      - my_network
+
+
+  
+  haproxy:
+    image: ubuntu:20.04
+    ports:
+      - "80:80"
+    volumes:
+      - ./haproxy.cfg:/haproxy.cfg 
+    command: >
+      bash -c "
+        export DEBIAN_FRONTEND=noninteractive &&
+        apt-get update && 
+        apt-get install -y curl openssh-server iputils-ping tcpdump sudo net-tools netcat python3 python3-pip nano git wget apache2 php libapache2-mod-php php-mysql &&
+        apt-get install -y software-properties-common &&
+        add-apt-repository ppa:vbernat/haproxy-2.6 -y &&
+        apt-get update &&
+        apt-get install haproxy -y &&
+        cp /haproxy.cfg /etc/haproxy/haproxy.cfg &&
+        service haproxy start &&
+        tail -f /dev/null
+      "  
+    networks:
+      - my_network  
+      
+    
+
+  internal_file_upload_webserver:
+    image: ubuntu:20.04
+    #ports:
+    # - "8081:80"
+    restart: always
+    #user: test
+    volumes:
+      - ./src2:/var/www/html
+      - ./uploads:/var/www/html/uploads
+      - ./log-monitor.sh:/tmp/log-monitor.sh
+    command: >
+      bash -c "
+        export DEBIAN_FRONTEND=noninteractive &&
+        apt-get update && 
+        apt-get install -y curl openssh-server mysql-server iputils-ping tcpdump sudo net-tools netcat python3 python3-pip nano git wget apache2 php libapache2-mod-php php-mysql &&
+        useradd -m John && 
+        echo John:LinSelanSteOdynoRtstUm | sudo chpasswd -e &&
+        useradd -m test && 
+        echo test:U6aMy0wojraho | sudo chpasswd -e &&
+        cp /tmp/log-monitor.sh /home/test &&
+        chmod +x /home/test/log-monitor.sh &&
+        echo 'test ALL=(root) SETENV:  NOPASSWD: /home/test/log-monitor.sh' | sudo tee -a /etc/sudoers &&
+        service ssh start &&
+        chown -R www-data:www-data /var/www/html &&
+        /usr/sbin/apachectl -D FOREGROUND 
+      "  
+    networks:
+      - my_network
+
+
+networks:
+  my_network:
+  
